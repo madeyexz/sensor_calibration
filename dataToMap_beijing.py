@@ -40,7 +40,18 @@ center_lat = 39.9042
 center_lon = 116.4074
 m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
 
-# Add points to the map (now using beijing_df instead of df)
+# Add Beijing boundary
+folium.GeoJson(
+    'geoJson/beijing.json',  # 您需要准备北京的 GeoJSON 文件
+    name='Beijing Boundary',
+    style_function=lambda x: {
+        'fillColor': 'transparent',
+        'color': 'blue',
+        'weight': 2
+    }
+).add_to(m)
+
+# Add points to the map
 for idx, row in beijing_df.iterrows():
     folium.CircleMarker(
         location=[float(row['latitude']), float(row['longitude'])],
@@ -48,6 +59,9 @@ for idx, row in beijing_df.iterrows():
         color='red',
         fill=True
     ).add_to(m)
+
+# Add layer control
+folium.LayerControl().add_to(m)
 
 # Save the map
 m.save('map_beijing.html')
