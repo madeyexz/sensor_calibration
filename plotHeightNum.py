@@ -37,10 +37,17 @@ bins = np.linspace(min_height, max_height, n_bins)
 
 # Create histogram
 plt.figure(figsize=(12, 6))
-plt.hist(beijing_df['value'], bins=bins, edgecolor='black')
+counts, bins, patches = plt.hist(beijing_df['value'], bins=bins, edgecolor='black')
+
+# Add count labels on top of each bar
+for i in range(len(counts)):
+    plt.text(bins[i] + (bins[1]-bins[0])/2, counts[i], 
+             f'{int(counts[i])}', 
+             ha='center', va='bottom')
+
 plt.xlabel('Height Value (m)')
 plt.ylabel('Number of Data Points')
-plt.title('Distribution of Height Values in Beijing')
+plt.title(f'Distribution of Height Values in Beijing')
 plt.grid(True, alpha=0.3)
 
 # Add mean and median lines
@@ -48,7 +55,7 @@ mean_height = beijing_df['value'].mean()
 median_height = beijing_df['value'].median()
 plt.axvline(mean_height, color='red', linestyle='dashed', label=f'Mean: {mean_height:.1f}m')
 plt.axvline(median_height, color='green', linestyle='dashed', label=f'Median: {median_height:.1f}m')
-plt.legend()
+plt.legend(title=f'Total Points: {len(beijing_df):,}')
 
 # Log statistics
 logging.info(f"Number of bins: {n_bins}")
@@ -59,5 +66,5 @@ logging.info(f"Mean height: {mean_height:.2f} meters")
 logging.info(f"Median height: {median_height:.2f} meters")
 
 # Save the plot
-plt.savefig('mapResult/height_distribution.png')
+plt.savefig('plotResults/height_distribution.png')
 plt.close()
