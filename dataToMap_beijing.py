@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import folium
 import logging
+import geopandas as gpd
+from shapely.geometry import Point
 
 # Set up logging
 logging.basicConfig(
@@ -13,22 +15,16 @@ logging.basicConfig(
 with np.load('data/2021051202_merged.npz') as npz_file:
     data = npz_file['data']
 
-# Define Beijing's approximate boundaries
-BEIJING_BOUNDS = {
-    'lat_min': 39.4,
-    'lat_max': 41.0,
-    'lon_min': 115.7,
-    'lon_max': 117.4
-}
+# Load Beijing boundary
+beijing_boundary = gpd.read_file('geoJson/beijing.json')
 
-# Filter data for Beijing
+# Convert DataFrame to GeoDataFrame
 df = pd.DataFrame(data, columns=['id', 'value', 'longitude', 'latitude', 'timestamp'])
-beijing_df = df[
-    (df['latitude'].astype(float) >= BEIJING_BOUNDS['lat_min']) &
-    (df['latitude'].astype(float) <= BEIJING_BOUNDS['lat_max']) &
-    (df['longitude'].astype(float) >= BEIJING_BOUNDS['lon_min']) &
-    (df['longitude'].astype(float) <= BEIJING_BOUNDS['lon_max'])
-]
+geometry = [Point(xy) for xy in zip(df['longitude'].astype(float), df['latitude'].astype(float))]
+gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
+
+# Spatial join with Beijing boundary
+beijing_df = gpd.sjoin(gdf, beijing_boundary, predicate='within')
 
 # Log the number of datapoints
 logging.info(f"Total number of datapoints: {len(df)}")
@@ -64,4 +60,4 @@ for idx, row in beijing_df.iterrows():
 folium.LayerControl().add_to(m)
 
 # Save the map
-m.save('map_beijing.html')
+m.save('mapResult/map_beijing.html')
