@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
-import folium
+import matplotlib.pyplot as plt
+import geopandas as gpd
+from shapely.geometry import Point
 import logging
 
 # Set up logging
@@ -13,41 +15,49 @@ logging.basicConfig(
 with np.load('data/2021051202_merged.npz') as npz_file:
     data = npz_file['data']
 
-# Define Beijing's approximate boundaries
-BEIJING_BOUNDS = {
-    'lat_min': 39.4,
-    'lat_max': 41.0,
-    'lon_min': 115.7,
-    'lon_max': 117.4
-}
+# Load Beijing boundary
+beijing_boundary = gpd.read_file('geoJson/beijing.json')
 
-# Filter data for Beijing
+# Convert DataFrame to GeoDataFrame
 df = pd.DataFrame(data, columns=['id', 'value', 'longitude', 'latitude', 'timestamp'])
-beijing_df = df[
-    (df['latitude'].astype(float) >= BEIJING_BOUNDS['lat_min']) &
-    (df['latitude'].astype(float) <= BEIJING_BOUNDS['lat_max']) &
-    (df['longitude'].astype(float) >= BEIJING_BOUNDS['lon_min']) &
-    (df['longitude'].astype(float) <= BEIJING_BOUNDS['lon_max'])
-]
+# Convert 'value' column to float
+df['value'] = pd.to_numeric(df['value'], errors='coerce')
+geometry = [Point(xy) for xy in zip(df['longitude'].astype(float), df['latitude'].astype(float))]
+gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
 
-# Log the number of datapoints
-logging.info(f"Total number of datapoints: {len(df)}")
-logging.info(f"Number of datapoints in Beijing: {len(beijing_df)}")
-logging.info(f"Percentage of points in Beijing: {(len(beijing_df)/len(df))*100:.2f}%")
+# Spatial join with Beijing boundary
+beijing_df = gpd.sjoin(gdf, beijing_boundary, predicate='within')
 
-# Create a map centered at Beijing's center
-center_lat = 39.9042
-center_lon = 116.4074
-m = folium.Map(location=[center_lat, center_lon], zoom_start=10)
+# Calculate histogram bins
+min_height = beijing_df['value'].min()
+max_height = beijing_df['value'].max()
+# Use Sturges' rule to determine number of bins
+n_bins = int(np.ceil(np.log2(len(beijing_df))) + 1)
+bins = np.linspace(min_height, max_height, n_bins)
 
-# Add points to the map (now using beijing_df instead of df)
-for idx, row in beijing_df.iterrows():
-    folium.CircleMarker(
-        location=[float(row['latitude']), float(row['longitude'])],
-        radius=3,
-        color='red',
-        fill=True
-    ).add_to(m)
+# Create histogram
+plt.figure(figsize=(12, 6))
+plt.hist(beijing_df['value'], bins=bins, edgecolor='black')
+plt.xlabel('Height Value (m)')
+plt.ylabel('Number of Data Points')
+plt.title('Distribution of Height Values in Beijing')
+plt.grid(True, alpha=0.3)
 
-# Save the map
-m.save('map_beijing.html')
+# Add mean and median lines
+mean_height = beijing_df['value'].mean()
+median_height = beijing_df['value'].median()
+plt.axvline(mean_height, color='red', linestyle='dashed', label=f'Mean: {mean_height:.1f}m')
+plt.axvline(median_height, color='green', linestyle='dashed', label=f'Median: {median_height:.1f}m')
+plt.legend()
+
+# Log statistics
+logging.info(f"Number of bins: {n_bins}")
+logging.info(f"Bin width: {(max_height - min_height) / n_bins:.2f} meters")
+logging.info(f"Min height: {min_height:.2f} meters")
+logging.info(f"Max height: {max_height:.2f} meters")
+logging.info(f"Mean height: {mean_height:.2f} meters")
+logging.info(f"Median height: {median_height:.2f} meters")
+
+# Save the plot
+plt.savefig('mapResult/height_distribution.png')
+plt.close()
